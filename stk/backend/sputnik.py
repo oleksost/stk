@@ -1,6 +1,6 @@
 import torch
 
-from stk.backend import triton_kernels as backend
+from stk.backend import triton_kernels_oo as backend
 from stk.backend.autocast import custom_bwd, custom_fwd
 
 
@@ -314,3 +314,65 @@ class RowIndices(torch.autograd.Function):
 
 
 row_indices = RowIndices.apply
+
+class SDD_SpMerge(torch.autograd.Function):
+
+    @staticmethod
+    @custom_fwd
+    def forward(ctx,
+                lhs,
+                rhs,
+                shape,
+                data,
+                row_indices,
+                column_indices,
+                column_indices_t,
+                block_offsets_t,
+                adap_data,
+                ada_maping):
+        # note for later: here we will need ofdfsets transpose and offsets for the baclkward pass if we implement it
+        # ctx.save_for_backward(
+        #     lhs,
+        #     rhs,
+        #     row_indices,
+        #     column_indices,
+        #     column_indices_t,
+        #     block_offsets_t)
+        # ctx.shape = shape
+        # merged_w = torch.empty(
+        #     rhs.shape,
+        #     dtype=rhs.dtype,
+        #     device=rhs.device)
+        # merged_w.data.copy_(rhs.data)
+        # backend.spmerge(
+        #             rhs,
+        #             shape,
+        #             merged_w,
+        #             row_indices,
+        #             column_indices,
+        #             adap_data,
+        #             adap_row_indices,
+        #             adap_column_indices)       
+        
+        # rhs = merged_w
+        out = torch.empty(
+            data.shape,
+            dtype=lhs.dtype,
+            device=lhs.device)
+        backend.sdd_spmerge(lhs,
+                    rhs,
+                    shape,
+                    out,
+                    row_indices,
+                    column_indices,
+                    adap_data,
+                    ada_maping)
+        return out
+
+    @staticmethod
+    @custom_bwd
+    def backward(ctx, dy):
+        raise NotImplementedError
+
+sdd_spsmerge = SDD_SpMerge.apply
+
